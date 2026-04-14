@@ -46,6 +46,34 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}
 
+  auto-tag:
+    # Only runs on direct pushes to master, not on tag pushes (avoids loop)
+    if: github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump patch version and push tag
+        run: |
+          latest=$(git tag -l "v*" | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            new_tag="v1.0.0"
+          else
+            major=$(echo "$latest" | cut -d. -f1 | tr -d v)
+            minor=$(echo "$latest" | cut -d. -f2)
+            patch=$(echo "$latest" | cut -d. -f3)
+            new_tag="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "Tagging $new_tag"
+          git tag "$new_tag"
+          git push origin "$new_tag"
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
